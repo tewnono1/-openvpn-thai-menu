@@ -1,0 +1,10 @@
+# openvpn-thai-menu
+สคริปต์จัดการ VPN หน้าเมนูภาษาไทย
+
+## วิธีใช้งาน
+1. ดาวน์โหลดสคริปต์:
+wget https://raw.githubusercontent.com/tewnono1/-openvpn-thai-menu/main/menu.sh
+2. เปิดสิทธิ์การรัน:
+chmod +x menu.sh
+3. สั่งรันเมนู:
+./menu.sh
