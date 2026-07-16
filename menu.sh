@@ -22,30 +22,57 @@ check_webserver() {
     chmod -R 755 /var/www/html/download
 }
 
-# [01] สร้างผู้ใช้
+# [01] สร้างชื่อผู้ใช้ (แก้ไขให้กรอกแทนอัตโนมัติ)
 engine_add_user() {
     check_webserver
     if [ ! -f "$ENGINE" ]; then
         echo -e "\n\e[1;31m[!] ไม่พบไฟล์ openvpn-install.sh ในโฟลเดอร์นี้\e[0m\n"
         return
     fi
-    MENU_OPTION="1" bash "$ENGINE"
-    cp /root/*.ovpn /var/www/html/download/ 2>/dev/null
-    cp ./*.ovpn /var/www/html/download/ 2>/dev/null
+    
+    echo -e "\n\e[1;36m[ระบบ]\e[0m เข้าสู่โหมดสร้างผู้ใช้ OpenVPN"
+    read -p "ใส่ชื่อผู้ใช้ใหม่ (ภาษาอังกฤษเท่านั้น): " username
+    username=$(echo "$username" | tr -d '\r' | tr -d ' ')
+    
+    if [ -z "$username" ]; then
+        echo -e "\e[1;31มชื่อผู้ใช้ห้ามว่าง!\e[0m"
+        return
+    fi
+
+    # ส่งค่า 1 (เลือกสร้างชื่อ) -> ส่งชื่อผู้ใช้ -> เลือก 1 (ไม่ใส่รหัสผ่าน) ไปให้ Angristan
+    echo -e "1\n$username\n1" | bash "$ENGINE"
+    
+    # ซิงค์ไฟล์ไปโฟลเดอร์ดาวน์โหลด
+    cp /root/"$username.ovpn" /var/www/html/download/ 2>/dev/null
+    cp ./"$username.ovpn" /var/www/html/download/ 2>/dev/null
     chmod -R 644 /var/www/html/download/
-    echo -e "\n\e[1;32m[สำเร็จ] สร้างและซิงค์ไฟล์ไปยังเมนู [24] แล้ว\e[0m\n"
+    
+    echo -e "\n\e[1;32m[สำเร็จ] สร้างบัญชี $username เรียบร้อยแล้ว!\e[0m"
+    echo -e "คุณสามารถดูลิงก์ดาวน์โหลดได้ที่เมนู [24]\n"
 }
 
-# [03] ลบผู้ใช้
+# [03] ลบผู้ใช้ (แก้ไขให้ลบอัตโนมัติ)
 engine_delete_user() {
     if [ ! -f "$ENGINE" ]; then
         echo -e "\n\e[1;31m[!] ไม่พบไฟล์ openvpn-install.sh ในโฟลเดอร์นี้\e[0m\n"
         return
     fi
-    MENU_OPTION="2" bash "$ENGINE"
-    rm -rf /var/www/html/download/* 2>/dev/null
-    cp /root/*.ovpn /var/www/html/download/ 2>/dev/null
-    chmod -R 644 /var/www/html/download/
+    
+    echo -e "\n\e[1;36m[ระบบ]\e[0m เข้าสู่โหมดลบผู้ใช้ OpenVPN"
+    read -p "ใส่ชื่อผู้ใช้ที่ต้องการลบ: " username
+    username=$(echo "$username" | tr -d '\r' | tr -d ' ')
+    
+    if [ -z "$username" ]; then
+        echo -e "\e[1;31มชื่อผู้ใช้ห้ามว่าง!\e[0m"
+        return
+    fi
+
+    # ส่งค่า 2 (เลือกลบชื่อ) -> ส่งชื่อผู้ใช้ -> ยืนยัน y ไปให้ Angristan
+    echo -e "2\n$username\ny" | bash "$ENGINE"
+    
+    # ลบไฟล์ในระบบหน้าเว็บออก
+    rm -f /var/www/html/download/"$username.ovpn" 2>/dev/null
+    echo -e "\n\e[1;31m[สำเร็จ] ลบสิทธิ์ผู้ใช้ $username ออกจากระบบแล้ว!\e[0m\n"
 }
 
 # [04] เช็คคนออนไลน์
@@ -112,7 +139,7 @@ show_download_links() {
             fi
         done
     else
-        echo -e "\e[1;31mยังไม่มีไฟล์ Config ใดๆ อยู่บนหน้าเว็บ\e[0m"
+        echo -e "\e[1;31มยังไม่มีไฟล์ Config ใดๆ อยู่บนหน้าเว็บ\e[0m"
     fi
     echo -e "─────────────────────────────────────────────────────────────\n"
 }
@@ -147,8 +174,6 @@ while true; do
     show_menu
     echo -n "Choose a menu ?? : "
     read -r choice
-    
-    # เคลียร์ค่าว่างแฝงและตัดอักษรแปลกปลอมออกให้หมด
     choice=$(echo "$choice" | tr -d '\r' | tr -d ' ' | tr -d '\n')
 
     case "$choice" in
