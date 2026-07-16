@@ -2,8 +2,9 @@
 
 # ดึง IP จริงของเครื่อง VPS มาทำลิงก์ดาวน์โหลด
 MYIP=$(wget -qO- iboy.im/ip || curl -s ifconfig.me || echo "ของคุณ")
+ENGINE="./openvpn-install.sh"
 
-# ฟังก์ชันตรวจสอบว่าติดตั้งเว็บเซิร์ฟเวอร์สำหรับดาวน์โหลดหรือยัง (ถ้ายังระบบจะลงให้เองอัตโนมัติ)
+# ฟังก์ชันตรวจสอบและตั้งค่าเว็บดาวน์โหลด
 check_webserver() {
     if ! command -v apache2 &> /dev/null && ! command -v nginx &> /dev/null; then
         echo -e "\n\e[1;33m[ระบบ]\e[0m กำลังติดตั้งส่วนเสริมระบบดาวน์โหลด (Apache)..."
@@ -12,38 +13,39 @@ check_webserver() {
         systemctl start apache2
         systemctl enable apache2
     fi
+    mkdir -p /var/www/html/download
 }
 
-# ฟังก์ชันสร้างผู้ใช้ + ส่งไฟล์ไปที่หน้าดาวน์โหลด
+# ฟังก์ชันสร้างผู้ใช้จริงโดยใช้เครื่องยนต์ Angristan
 engine_add_user() {
     check_webserver
-    echo -e "\n\e[1;36m[ระบบ]\e[0m เข้าสู่โหมดสร้างผู้ใช้"
-    read -p "ใส่ชื่อผู้ใช้ใหม่ (ภาษาอังกฤษ): " username
-    if [ -z "$username" ]; then
-        echo -e "\e[1;31mชื่อผู้ใช้ห้ามว่าง!\e[0m"
+    
+    # ตรวจสอบว่ามีไฟล์เครื่องยนต์ติดตั้งอยู่ไหม
+    if [ ! -f "$ENGINE" ]; then
+        echo -e "\n\e[1;31m[ข้อผิดพลาด] ไม่พบไฟล์ openvpn-install.sh ในโฟลเดอร์เดียวกัน\e[0m"
+        echo -e "กรุณาดาวน์โหลดมาก่อน หรือใช้เมนูติดตั้งระบบก่อนครับ\e[0m"
         return
     fi
+
+    echo -e "\n\e[1;36m[ระบบ]\e[0m กำลังเข้าสู่โหมดสร้างผู้ใช้ของ Angristan..."
+    echo -e "\e[1;33m(กรุณากรอกชื่อผู้ใช้ตามขั้นตอนของระบบหลังบ้านด้านล่างนี้)\e[0m\n"
     
-    # 1. จำลองการสร้างไฟล์ config จริงในเครื่อง (ถ้าใช้ Angristan ตัวเต็ม โค้ดจะสร้างให้อัตโนมัติ)
-    mkdir -p /root
-    echo "client" > "/root/$username.ovpn"
-    echo "dev tun" >> "/root/$username.ovpn"
-    echo "proto udp" >> "/root/$username.ovpn"
-    echo "remote $MYIP 1194" >> "/root/$username.ovpn"
+    # รันเครื่องยนต์จริงของ Angristan เพื่อสร้างไฟล์ .ovpn แท้ๆ
+    # ระบบจะถามชื่อผู้ใช้ และตั้งค่าคีย์เข้ารหัสให้อัตโนมัติ
+    MENU_OPTION="1" bash "$ENGINE"
     
-    # 2. คัดลอกไฟล์ไปยังโฟลเดอร์เว็บเพื่อให้ดาวน์โหลดได้ผ่านลิงก์
-    mkdir -p /var/www/html/download
-    cp "/root/$username.ovpn" "/var/www/html/download/$username.ovpn"
-    chmod 644 "/var/www/html/download/$username.ovpn"
+    # ค้นหาไฟล์ .ovpn ล่าสุดที่เพิ่งถูกสร้างขึ้นในโฟลเดอร์ /root หรือโฟลเดอร์ปัจจุบัน
+    # แล้วคัดลอกไปยังโฟลเดอร์ดาวน์โหลดของหน้าเว็บ
+    echo -e "\n\e[1;36m[ระบบ]\e[0m กำลังซิงค์ไฟล์ไปยังระบบดาวน์โหลด..."
+    cp /root/*.ovpn /var/www/html/download/ 2>/dev/null
+    cp ./*.ovpn /var/www/html/download/ 2>/dev/null
+    chmod -R 644 /var/www/html/download/
     
-    echo -e "\n\e[1;32mสร้างผู้ใช้ $username สำเร็จแล้ว!\e[0m"
-    echo -e "─────────────────────────────────────────────────────"
-    echo -e "\e[1;35m🔗 ลิงก์ดาวน์โหลด Config ของคุณ:\e[0m"
-    echo -e "\e[1;34mhttp://$MYIP/download/$username.ovpn\e[0m"
-    echo -e "─────────────────────────────────────────────────────\n"
+    echo -e "\n\e[1;32m[สำเร็จ] ระบบซิงค์ข้อมูลเรียบร้อยแล้ว!\e[0m"
+    echo -e "คุณสามารถตรวจสอบลิงก์ดาวน์โหลดได้ที่ เมนู [24] ครับ\n"
 }
 
-# ฟังก์ชันเรียกดูลิงก์ดาวน์โหลดทั้งหมดที่มีอยู่ (เทียบเท่าเมนู 24)
+# ฟังก์ชันเรียกดูลิงก์ดาวน์โหลดทั้งหมดที่มีอยู่
 show_download_links() {
     clear
     echo -e "\e[1;31m ─────────────── รายการลิงก์ดาวน์โหลด CONFIG ───────────────\e[0m"
@@ -51,9 +53,12 @@ show_download_links() {
         echo -e "คุณสามารถก๊อปปี้ลิงก์ด้านล่างนี้ไปเปิดในบราวเซอร์เพื่อดาวน์โหลด:\n"
         for file in /var/www/html/download/*.ovpn; do
             filename=$(basename "$file")
-            echo -e "• User: \e[1;32m${filename%.*}\e[0m"
-            echo -e "  URL: \e[1;34mhttp://$MYIP/download/$filename\e[0m"
-            echo -e "-----------------------------------------------------"
+            # กรองแสดงเฉพาะไฟล์ที่มีข้อมูลจริง
+            if [ -s "$file" ]; then
+                echo -e "• User: \e[1;32m${filename%.*}\e[0m"
+                echo -e "  URL: \e[1;34mhttp://$MYIP/download/$filename\e[0m"
+                echo -e "-----------------------------------------------------"
+            fi
         done
     else
         echo -e "\e[1;31mยังไม่มีการสร้างไฟล์ Config ใดๆ ในระบบ\e[0m"
@@ -79,7 +84,7 @@ show_menu() {
     echo -e "\e[1;34m[\e[1;37m06\e[1;34m]\e[0m • เปลี่ยนขีด จำกัดเชื่อมต่อ   \e[1;34m[\e[1;37m16\e[1;34m]\e[0m • จำกัดการเชื่อมต่อ"
     echo -e "\e[1;34m[\e[1;37m07\e[1;34m]\e[0m • เปลี่ยนรหัสผ่าน          \e[1;34m[\e[1;37m17\e[1;34m]\e[0m • VPN ที่ไม่ดี"
     echo -e "\e[1;34m[\e[1;37m08\e[1;34m]\e[0m • ลบผู้ใช้หมดอายุแล้ว       \e[1;34m[\e[1;37m18\e[1;34m]\e[0m • ข้อมูล VPS"
-    echo -e "\e[1;34m[\e[1;37m09\e[1;34m]\e[0m • เช็คบัญชีทั้งหมด          \e[1;34m[\e[1;37m24\e[1;34m]\e[0m • ดาวน์โหลด config.ovpn \e[1;32m<-- เพิ่มใหม่\e[0m"
+    echo -e "\e[1;34m[\e[1;37m09\e[1;34m]\e[0m • เช็คบัญชีทั้งหมด          \e[1;34m[\e[1;37m24\e[1;34m]\e[0m • ดาวน์โหลด config.ovpn"
     echo -e "\e[1;34m[\e[1;30m10\e[1;34m]\e[0m • ตั้งค่าระบบต่างๆ          \e[1;31m[\e[1;37m00\e[1;31m]\e[0m • ออก <<<"
     echo -e "─────────────────────────────────────────────────────"
 }
@@ -94,7 +99,6 @@ while true; do
             read -p "กด Enter เพื่อกลับหน้าเมนูหลัก"
             ;;
         24)
-            # เมนูดาวน์โหลดลิงก์ตามที่คุณต้องการ
             show_download_links
             read -p "กด Enter เพื่อกลับหน้าเมนูหลัก"
             ;;
